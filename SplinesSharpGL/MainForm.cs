@@ -824,34 +824,24 @@ namespace NurbsEditor
             lastMouseX = e.X;
             lastMouseY = e.Y;
 
-            // --------------------------------------
-            // ПКМ -> камера
-            // --------------------------------------
-
+            // ПКМ - камера
             if (e.Button == MouseButtons.Right)
             {
                 cameraDragging = true;
-
                 return;
             }
 
-            // --------------------------------------
-            // ЛКМ
-            // --------------------------------------
+            if (e.Button != MouseButtons.Left) return;
 
-            if (e.Button != MouseButtons.Left)
-            {
-                return;
-            }
+            // =========================================
+            // 1. Проверяем существующую точку
+            // =========================================
 
-            // Проверяем, кликнули ли
-            // по существующей точке.
             int pointIndex = FindPointAt(
             e.X, e.Y);
 
             if (pointIndex >= 0)
             {
-                // Выбираем существующую точку.
                 selectedPointIndex = pointIndex;
 
                 pointDragging = true;
@@ -863,16 +853,47 @@ namespace NurbsEditor
                 return;
             }
 
-            // --------------------------------------
-            // Если точки под мышью нет ->
-            // создаём новую
-            // --------------------------------------
+            // Координаты клика в мире
 
             double x = camera.ScreenToWorldX(
             e.X, glControl.Width);
 
             double y = camera.ScreenToWorldY(
             e.Y, glControl.Height);
+
+            // =========================================
+            // 2. Проверяем управляющую ломаную
+            // =========================================
+
+            int segment = FindControlPolygonSegment(
+            e.X, e.Y);
+
+            if (segment >= 0)
+            {
+                // Вставляем новую управляющую точку
+                // между двумя существующими
+
+                curve.Points.Insert(
+                segment + 1, new ControlPoint(
+                x, y, 1.0));
+
+                selectedPointIndex = segment + 1;
+
+                pointDragging = true;
+
+                UpdateSelectedPointUI();
+
+                UpdateInfo();
+
+                glControl.Refresh();
+
+                return;
+            }
+
+            // =========================================
+            // 3. Если ничего не нашли -
+            //    создаём новую точку
+            // =========================================
 
             curve.Points.Add(
             new ControlPoint(
@@ -1214,7 +1235,8 @@ namespace NurbsEditor
                 selected = "нет";
             }
 
-            infoLabel.Text = "ЛКМ пусто — добавить\n" + "ЛКМ точка — выбрать\n" + "ЛКМ + drag — двигать\n" + "ПКМ + drag — камера\n" + "Колесо — масштаб\n" + "Delete — удалить точку\n" + "Esc — снять выбор\n\n" +
+            infoLabel.Text = "ЛКМ пусто — добавить\n" + "ЛКМ точка — выбрать\n" + "ЛКМ на ломаной — вставить\n" + "ЛКМ + drag — двигать\n"
+                + "ПКМ + drag — камера\n" + "Колесо — масштаб\n" + "Delete — удалить точку\n" + "Esc — снять выбор\n\n" +
 
             "Точек: " + curve.Points.Count + "\n" +
 
@@ -1226,5 +1248,84 @@ namespace NurbsEditor
 
             status;
         }
+
+        private int FindControlPolygonSegment(
+        int mouseX, int mouseY)
+        {
+            if (curve.Points.Count < 2) return -1;
+
+            double minDistance = 10.0;
+
+            int result = -1;
+
+            for (int i = 0;
+            i < curve.Points.Count - 1;
+            i++)
+            {
+                ControlPoint a = curve.Points[i];
+
+                ControlPoint b = curve.Points[i + 1];
+
+                double ax = WorldToScreenX(a.X);
+
+                double ay = WorldToScreenY(a.Y);
+
+                double bx = WorldToScreenX(b.X);
+
+                double by = WorldToScreenY(b.Y);
+
+                double distance = DistanceToSegment(
+                mouseX, mouseY, ax, ay, bx, by);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+
+                    result = i;
+                }
+            }
+
+            // Если режим периодический,
+            // добавляем последний сегмент
+            if (curve.Mode == NurbsMode.Periodic)
+            {
+                ControlPoint a = curve.Points[
+                curve.Points.Count - 1];
+
+                ControlPoint b = curve.Points[0];
+
+                double distance = DistanceToSegment(
+                mouseX, mouseY, WorldToScreenX(a.X), WorldToScreenY(a.Y), WorldToScreenX(b.X), WorldToScreenY(b.Y));
+
+                if (distance < minDistance)
+                {
+                    result = curve.Points.Count - 1;
+                }
+            }
+
+            return result;
+        }
+
+        private double DistanceToSegment(
+        double px, double py, double x1, double y1, double x2, double y2)
+        {
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+
+            if (dx == 0 && dy == 0) return Math.Sqrt((px - x1) * (px - x1) + (py - y1) * (py - y1));
+
+            double t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+
+            t = Math.Max(
+            0, Math.Min(
+            1, t));
+
+            double nx = x1 + t * dx;
+
+            double ny = y1 + t * dy;
+
+            return Math.Sqrt((px - nx) * (px - nx) + (py - ny) * (py - ny));
+        }
+
     }
 }
