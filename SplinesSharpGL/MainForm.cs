@@ -330,7 +330,6 @@ namespace NurbsEditor
             gl.End();
         }
 
-        // Подписи и числовые отметки координатных осей
         private void DrawAxisLabels(OpenGL gl)
         {
             int width = Math.Max(glControl.Width, 1);
@@ -343,8 +342,6 @@ namespace NurbsEditor
             double top = camera.Y + halfHeight;
             double gridStep = CalculateGridStep();
 
-            // WorldToScreenY возвращает координату от верхнего края окна.
-            // Для DrawText OpenGL нужна координата от нижнего края.
             double xAxisScreenY = WorldToScreenY(0.0);
             double xAxisGlY = height - xAxisScreenY;
             double yAxisScreenX = WorldToScreenX(0.0);
@@ -353,8 +350,7 @@ namespace NurbsEditor
             bool yAxisVisible =
                 yAxisScreenX >= 0 && yAxisScreenX <= width;
 
-            // Числа X размещаем рядом с осью X. Если ось близко к краю
-            // или за пределами экрана — используем нижний край окна.
+
             int xLabelsY;
             if (xAxisVisible)
             {
@@ -368,8 +364,6 @@ namespace NurbsEditor
             }
             xLabelsY = Math.Max(4, Math.Min(height - 16, xLabelsY));
 
-            // Числа Y располагаем слева от оси Y. Если там недостаточно
-            // места или ось вне окна — переносим подписи к левому краю.
             int yLabelsX;
             if (yAxisVisible)
             {
@@ -383,8 +377,7 @@ namespace NurbsEditor
             }
             yLabelsX = Math.Max(4, Math.Min(width - 42, yLabelsX));
 
-            // Текст рисуется в экранных координатах и не меняет размер
-            // при масштабировании рабочей области.
+
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PushMatrix();
             gl.LoadIdentity();
@@ -394,7 +387,6 @@ namespace NurbsEditor
             gl.LoadIdentity();
             gl.Disable(OpenGL.GL_DEPTH_TEST);
 
-            // Числовые отметки оси X.
             double startX = Math.Ceiling(left / gridStep) * gridStep;
             for (double x = startX; x <= right; x += gridStep)
             {
@@ -402,13 +394,11 @@ namespace NurbsEditor
                 if (screenX < 2 || screenX > width - 42)
                     continue;
 
-                // Ноль будет выведен отдельно в начале координат.
                 if (Math.Abs(x) < gridStep * 0.000001)
                     continue;
                 gl.DrawText(screenX + 3, xLabelsY, 0.88f, 0.90f, 0.94f, "Arial", 12f, x.ToString("0.###"));
             }
 
-            // Числовые отметки оси Y.
             double startY = Math.Ceiling(bottom / gridStep) * gridStep;
             for (double y = startY; y <= top; y += gridStep)
             {
@@ -421,7 +411,6 @@ namespace NurbsEditor
                 gl.DrawText(yLabelsX, labelGlY, 0.88f, 0.90f, 0.94f, "Arial", 12f, y.ToString("0.###"));
             }
 
-            // Ноль показываем один раз — рядом с пересечением осей.
             if (xAxisVisible && yAxisVisible)
             {
                 int zeroX = (int)Math.Round(yAxisScreenX) + 5;
@@ -431,8 +420,6 @@ namespace NurbsEditor
                 gl.DrawText(zeroX, zeroY, 0.88f, 0.90f, 0.94f, "Arial", 12f, "0");
             }
 
-            // Названия осей. Их положение также рассчитывается
-            // в системе координат OpenGL (начало снизу слева).
             int xNameY = xAxisVisible
                 ? (int)Math.Round(xAxisGlY + 8)
                 : 8;
@@ -444,7 +431,6 @@ namespace NurbsEditor
             gl.DrawText(width - 22, xNameY, 1.0f, 0.85f, 0.35f, "Arial", 14f, "X");
             gl.DrawText(yNameX, height - 18, 1.0f, 0.85f, 0.35f, "Arial", 14f, "Y");
 
-            // Восстанавливаем матрицы для дальнейшей отрисовки сцены.
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PopMatrix();
@@ -467,9 +453,6 @@ namespace NurbsEditor
             }
             gl.End();
 
-            // Для периодического режима
-            // показываем визуальное замыкание
-            // управляющего многоугольника.
             if (curve.Mode == NurbsMode.Periodic && curve.Points.Count >= 2)
             {
                 ControlPoint first = curve.Points[0];
@@ -580,7 +563,6 @@ namespace NurbsEditor
             }
             if (e.Button != MouseButtons.Left) return;
 
-            // 1. Проверяем существующую точку
             int pointIndex = FindPointAt(e.X, e.Y);
             if (pointIndex >= 0)
             {
@@ -595,13 +577,10 @@ namespace NurbsEditor
             double x = camera.ScreenToWorldX(e.X, glControl.Width);
             double y = camera.ScreenToWorldY(e.Y, glControl.Height);
 
-            // 2. Проверяем управляющую ломаную
             int segment = FindControlPolygonSegment(e.X, e.Y);
             if (segment >= 0)
             {
 
-                // Вставляем новую управляющую точку
-                // между двумя существующими
                 curve.Points.Insert(segment + 1, new ControlPoint(x, y, 1.0));
                 UpdateDegreeLimit();
                 selectedPointIndex = segment + 1;
@@ -612,8 +591,6 @@ namespace NurbsEditor
                 return;
             }
 
-            // 3. Если ничего не нашли -
-            //    создаём новую точку
             curve.Points.Add(new ControlPoint(x, y, 1.0));
             UpdateDegreeLimit();
             selectedPointIndex = curve.Points.Count - 1;
@@ -671,8 +648,6 @@ namespace NurbsEditor
         private void GlControl_MouseWheel(object sender, MouseEventArgs e)
         {
 
-            // Сохраняем мировую координату,
-            // которая находится под курсором.
             double oldWorldX = camera.ScreenToWorldX(e.X, glControl.Width);
             double oldWorldY = camera.ScreenToWorldY(e.Y, glControl.Height);
             if (e.Delta > 0)
@@ -685,7 +660,6 @@ namespace NurbsEditor
             }
             camera.Zoom = Math.Max(5.0, Math.Min(1000.0, camera.Zoom));
 
-            // Новый world под мышью
             double newWorldX = camera.ScreenToWorldX(e.X, glControl.Width);
             double newWorldY = camera.ScreenToWorldY(e.Y, glControl.Height);
 
@@ -718,21 +692,15 @@ namespace NurbsEditor
             else if (pointsRemoved)
             {
 
-                // После удаления точек степень не должна превышать
-                // количество оставшихся точек минус один.
                 maxDegree = Math.Max(1, curve.Points.Count - 1);
             }
             else
             {
 
-                // При добавлении точек сохраняем заранее выбранную
-                // степень, но не разрешаем повышать её выше лимита.
                 maxDegree = Math.Max(curve.Degree, Math.Max(1, curve.Points.Count - 1));
             }
             maxDegree = Math.Min(10, maxDegree);
 
-            // Сначала уменьшаем значение, если новый максимум ниже него,
-            // чтобы NumericUpDown не получил недопустимое значение.
             if (degreeBox.Value > maxDegree)
             {
                 degreeBox.Value = maxDegree;
@@ -815,7 +783,6 @@ namespace NurbsEditor
             }
         }
 
-        // UI выбранной точки
         private void UpdateSelectedPointUI()
         {
             bool hasSelection = selectedPointIndex >= 0 && selectedPointIndex < curve.Points.Count;
@@ -840,8 +807,6 @@ namespace NurbsEditor
                 weightValue = weightBox.Maximum;
             }
 
-            // Не вызываем ValueChanged,
-            // если значение и так совпадает.
             if (weightBox.Value != weightValue)
             {
                 weightBox.Value = weightValue;
@@ -906,8 +871,6 @@ namespace NurbsEditor
                 }
             }
 
-            // Если режим периодический,
-            // добавляем последний сегмент
             if (curve.Mode == NurbsMode.Periodic)
             {
                 ControlPoint a = curve.Points[curve.Points.Count - 1];
