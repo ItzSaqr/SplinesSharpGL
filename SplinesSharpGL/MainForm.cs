@@ -224,7 +224,7 @@ namespace NurbsEditor
 
             modeBox.Items.Add("Закрытый");
 
-            modeBox.Items.Add("Замкнутый / периодический");
+            modeBox.Items.Add("Замкнутый");
 
             modeBox.SelectedIndex = 0;
 
@@ -877,6 +877,8 @@ namespace NurbsEditor
                 segment + 1, new ControlPoint(
                 x, y, 1.0));
 
+                UpdateDegreeLimit();
+
                 selectedPointIndex = segment + 1;
 
                 pointDragging = true;
@@ -898,6 +900,8 @@ namespace NurbsEditor
             curve.Points.Add(
             new ControlPoint(
             x, y, 1.0));
+
+            UpdateDegreeLimit();
 
             selectedPointIndex = curve.Points.Count - 1;
 
@@ -1043,6 +1047,46 @@ namespace NurbsEditor
             glControl.Refresh();
         }
 
+        // Ограничиваем степень количеством контрольных точек.
+        // До добавления точек разрешаем выбрать степень заранее.
+        private void UpdateDegreeLimit(bool pointsRemoved = false)
+        {
+            int maxDegree;
+
+            if (curve.Points.Count == 0)
+            {
+                // Пользователь может заранее настроить степень.
+                maxDegree = 10;
+            }
+            else if (pointsRemoved)
+            {
+                // После удаления точек степень не должна превышать
+                // количество оставшихся точек минус один.
+                maxDegree = Math.Max(1, curve.Points.Count - 1);
+            }
+            else
+            {
+                // При добавлении точек сохраняем заранее выбранную
+                // степень, но не разрешаем повышать её выше лимита.
+                maxDegree = Math.Max(
+                    curve.Degree,
+                    Math.Max(1, curve.Points.Count - 1));
+            }
+
+            maxDegree = Math.Min(10, maxDegree);
+
+            // Сначала уменьшаем значение, если новый максимум ниже него,
+            // чтобы NumericUpDown не получил недопустимое значение.
+            if (degreeBox.Value > maxDegree)
+            {
+                degreeBox.Value = maxDegree;
+            }
+
+            degreeBox.Maximum = maxDegree;
+
+            curve.Degree = (int)degreeBox.Value;
+        }
+
         // ==========================================
         // Режим
         // ==========================================
@@ -1095,6 +1139,8 @@ namespace NurbsEditor
             curve.Points.RemoveAt(
             selectedPointIndex);
 
+            UpdateDegreeLimit(pointsRemoved: true);
+
             selectedPointIndex = -1;
 
             pointDragging = false;
@@ -1120,6 +1166,8 @@ namespace NurbsEditor
         object sender, EventArgs e)
         {
             curve.Points.Clear();
+
+            UpdateDegreeLimit();
 
             selectedPointIndex = -1;
 
