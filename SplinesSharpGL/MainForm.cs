@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -104,7 +104,7 @@ namespace NurbsEditor
             degreeBox.Top = 82;
             degreeBox.Width = 210;
             degreeBox.Minimum = 1;
-            degreeBox.Maximum = 10;
+            degreeBox.Maximum = 100;
             degreeBox.Value = 3;
             degreeBox.ValueChanged += DegreeBox_ValueChanged;
             rightPanel.Controls.Add(degreeBox);
@@ -500,7 +500,7 @@ namespace NurbsEditor
             {
                 return;
             }
-            var curvePoints = curve.BuildCurve(600);
+            var curvePoints = curve.BuildCurve(curve.GetRecommendedSamples());
             if (curvePoints.Count == 0)
             {
                 return;
@@ -687,19 +687,21 @@ namespace NurbsEditor
             {
 
                 // Пользователь может заранее настроить степень.
-                maxDegree = 10;
+                maxDegree = 100;
             }
             else if (pointsRemoved)
             {
 
+                // Максимум: степень + 1 равна числу точек.
                 maxDegree = Math.Max(1, curve.Points.Count - 1);
             }
             else
             {
 
+                // Не сбрасываем заранее выбранную степень,
+                // пока точек ещё недостаточно для неё.
                 maxDegree = Math.Max(curve.Degree, Math.Max(1, curve.Points.Count - 1));
             }
-            maxDegree = Math.Min(10, maxDegree);
 
             if (degreeBox.Value > maxDegree)
             {

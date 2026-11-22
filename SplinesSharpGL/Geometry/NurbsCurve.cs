@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -35,6 +35,27 @@ namespace NurbsEditor.Geometry
             {
                 return Points.Count >= Degree + 1;
             }
+        }
+
+        // Число разбиений зависит от степени и числа
+        // контрольных точек, чтобы кривая не выглядела ломаной.
+        public int GetRecommendedSamples()
+        {
+            if (!CanBuild) return 0;
+
+            int spans;
+            if (Mode == NurbsMode.Periodic)
+            {
+                spans = Points.Count;
+            }
+            else
+            {
+                spans = Math.Max(1, Points.Count - Degree);
+            }
+
+            int perSpan = Math.Max(30, Degree * 8);
+            int samples = Math.Max(600, spans * perSpan);
+            return Math.Min(50000, samples);
         }
 
         public List<PointF> BuildCurve(int samples = 400)
@@ -145,15 +166,52 @@ namespace NurbsEditor.Geometry
         private PointF Evaluate(
         double u, List<ControlPoint> points, int degree, double[] knots)
         {
+            int count = points.Count;
+
+            // Базисные функции считаются итеративно по
+            // треугольной схеме Кокса-де Бура: столбец
+            // степени d строится из столбца степени d - 1.
+            double[] basis = new double[count];
+            for (int i = 0; i < count; i++)
+            {
+                basis[i] = knots[i] <= u && u < knots[i + 1] ? 1.0 : 0.0;
+            }
+
+            for (int d = 1; d <= degree; d++)
+            {
+                double[] next = new double[count];
+                for (int i = 0; i < count; i++)
+                {
+                    double left = 0.0;
+                    double right = 0.0;
+
+                    double leftDenominator = knots[i + d] - knots[i];
+                    if (Math.Abs(leftDenominator) > 1e-12)
+                    {
+                        left = (u - knots[i]) / leftDenominator * basis[i];
+                    }
+
+                    if (i + 1 < count)
+                    {
+                        double rightDenominator = knots[i + d + 1] - knots[i + 1];
+                        if (Math.Abs(rightDenominator) > 1e-12)
+                        {
+                            right = (knots[i + d + 1] - u) / rightDenominator * basis[i + 1];
+                        }
+                    }
+
+                    next[i] = left + right;
+                }
+                basis = next;
+            }
+
             double numeratorX = 0.0;
             double numeratorY = 0.0;
             double denominator = 0.0;
 
-            for (int i = 0; i < points.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-                double basis = Basis(i, degree, u, knots);
-
-                double value = basis * points[i].Weight;
+                double value = basis[i] * points[i].Weight;
 
                 numeratorX += value * points[i].X;
 
@@ -165,37 +223,6 @@ namespace NurbsEditor.Geometry
             if (Math.Abs(denominator) < 1e-12) return PointF.Empty;
 
             return new PointF((float)(numeratorX / denominator), (float)(numeratorY / denominator));
-        }
-
-        // Формула Кокса-де Бура
-        private double Basis(
-        int i, int degree, double u, double[] knots)
-        {
-            if (degree == 0)
-            {
-                if (knots[i] <= u && u < knots[i + 1]) return 1.0;
-
-                return 0.0;
-            }
-
-            double left = 0.0;
-            double right = 0.0;
-
-            double leftDenominator = knots[i + degree] - knots[i];
-
-            if (Math.Abs(leftDenominator) > 1e-12)
-            {
-                left = (u - knots[i]) / leftDenominator * Basis(i, degree - 1, u, knots);
-            }
-
-            double rightDenominator = knots[i + degree + 1] - knots[i + 1];
-
-            if (Math.Abs(rightDenominator) > 1e-12)
-            {
-                right = (knots[i + degree + 1] - u) / rightDenominator * Basis(i + 1, degree - 1, u, knots);
-            }
-
-            return left + right;
         }
 
         // --------------------------------------------
